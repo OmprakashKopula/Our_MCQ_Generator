@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Royal MCQ Generator</title>
+    <style>
+        /* General Reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Garamond', serif;
+            background: linear-gradient(135deg, #4B0082, #8A2BE2, #DA70D6);
+            color: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 3rem;
+            margin-bottom: 20px;
+            color: #FFD700;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.6);
+        }
+        main {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+            width: 80%;
+            max-width: 700px;
+        }
+        label {
+            display: block;
+            margin: 15px 0 5px;
+            font-size: 1.2rem;
+            color: #FFD700;
+        }
+        textarea, input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #FFD700;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+            font-size: 1rem;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            margin-top: 15px;
+            background: linear-gradient(90deg, #FFD700, #FF6347);
+            border: none;
+            border-radius: 8px;
+            color: #000;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.3s ease;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(255, 215, 0, 0.5);
+        }
+        .mcq {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #FFD700;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+        }
+        .mcq h4 {
+            font-size: 1.3rem;
+            color: #FFD700;
+            margin-bottom: 10px;
+        }
+        .mcq ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        .mcq li {
+            margin-bottom: 5px;
+            font-size: 1.1rem;
+        }
+        .mcq p {
+            margin-top: 10px;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+        footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 1rem;
+            color: #FFD700;
+        }
+    </style>
+</head>
+<body>
+    <h1>MCQ Generator</h1>
+    <main>
+        <form id="mcq-form">
+            <label for="paragraph">Enter Paragraph:</label>
+            <textarea id="paragraph" name="paragraph" placeholder="Paste your text here..."></textarea>
+            <label for="num-questions">Number of Questions:</label>
+            <input type="number" id="num-questions" name="num-questions" min="1" value="5">
+            <button type="submit">Generate MCQs</button>
+        </form>
+        <div id="mcq-results"></div>
+        <button id="download-pdf" style="display: none;">Download as PDF</button>
+    </main>
+    <footer>
+        &copy; 2024 Omprakash Kopula | All Rights Reserved
+    </footer>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+    <script>
+        document.getElementById("mcq-form").addEventListener("submit", async function (event) {
+            event.preventDefault();
+            const paragraph = document.getElementById("paragraph").value;
+            const numQuestions = document.getElementById("num-questions").value;
+
+            const response = await fetch("http://127.0.0.1:5000/generate-mcqs", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ paragraph, numQuestions })
+            });
+
+            const data = await response.json();
+            const mcqContainer = document.getElementById("mcq-results");
+            const downloadButton = document.getElementById("download-pdf");
+            mcqContainer.innerHTML = "";
+            downloadButton.style.display = "none";
+
+            if (data.mcqs.length > 0) {
+                let pdfData = [];
+                let pdfIndex = 1;
+
+                data.mcqs.forEach((mcq, index) => {
+                    const mcqDiv = document.createElement("div");
+                    mcqDiv.className = "mcq";
+                    mcqDiv.innerHTML = `
+                        <h4>Q${index + 1}: ${mcq.question}</h4>
+                        <ul>
+                            ${mcq.choices.map((choice, i) => `<li>${String.fromCharCode(65 + i)}) ${choice}</li>`).join("")}
+                        </ul>
+                    `;
+                    mcqContainer.appendChild(mcqDiv);
+
+                    pdfData.push([
+                        `Q${pdfIndex++}: ${mcq.question}`,
+                        mcq.choices.map((choice, i) => `${String.fromCharCode(65 + i)}) ${choice}`).join("\n")
+                    ]);
+                });
+
+                downloadButton.style.display = "block";
+                downloadButton.onclick = () => {
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF();
+                    doc.setFontSize(18);
+                    doc.text("Answer the following", 10, 10);
+                    doc.setLineWidth(0.5);
+                    doc.rect(5, 5, 200, 285);
+                    doc.setFontSize(12);
+
+                    let y = 20; // Initial Y position
+                    pdfData.forEach(([question, choices], i) => {
+                        doc.text(question, 10, y);
+                        y += 10; // Increment Y position for each question
+                        doc.text(choices, 10, y);
+                        y += 10; // Increment further
+                        if (y > 270) {
+                            doc.addPage();
+                            y = 20; // Reset Y position for new page
+                        }
+                    });
+
+                    doc.save("mcqs.pdf");
+                };
+            } else {
+                mcqContainer.innerHTML = "<p>No MCQs could be generated from the input text.</p>";
+            }
+        });
+    </script>
+</body>
+</html>
